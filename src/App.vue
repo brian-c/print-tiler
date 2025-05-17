@@ -1,40 +1,15 @@
 <script setup lang="ts">
-import { get as idbGet, set as idbSet } from 'idb-keyval';
-import { computed, onMounted, reactive, toRaw, useId, watch } from 'vue';
+import { computed, reactive, useId } from 'vue';
 import FileSelectionButton from './FileSelectionButton.vue';
+import { images, pageSetup } from './lib/app-state';
+import { createDragHandler } from './lib/create-drag-handler';
 import { loadImage } from './lib/load-image';
 import UnitInput from './UnitInput.vue';
 
-interface PageSetup {
-	width: number;
-	height: number;
-	margin: number;
-	overlap: number;
-	cutMarkColor: string;
-}
-
-interface FileState {
-	file: File;
-	img: HTMLImageElement;
-	width: number;
-	height: number;
-	x: number;
-	y: number;
-}
-
-const STORED_STATE_KEY = 'print-tiler-state';
-
 const svgId = useId();
 
-const page = reactive<PageSetup>({ width: 11 * 25.4, height: 8.5 * 25.4, margin: 0.5 * 25.4, overlap: 6, cutMarkColor: 'red' });
-const files = reactive<FileState[]>([]);
-watch([page, files], () => idbSet(STORED_STATE_KEY, {
-	page: toRaw(page),
-	files: toRaw(files.map(state => ({ ...state, img: { src: state.img.src } }))),
-}));
-
 const bbox = computed(() => {
-	const bounds = Array.from(files).reduce((current, file) => {
+	const bounds = Array.from(images).reduce((current, file) => {
 		return [
 			Math.min(current[0], file.y),
 			Math.max(current[1], file.x + file.width),
@@ -54,20 +29,20 @@ const bbox = computed(() => {
 });
 
 const tiles = computed(() => {
-	const width = page.width - page.margin * 2;
+	const width = pageSetup.width - pageSetup.margin * 2;
 	let tiledBboxWidth = Infinity;
 	let across = 0;
-	while (tiledBboxWidth > width * across - page.overlap * (across - 1)) {
+	while (tiledBboxWidth > width * across - pageSetup.overlap * (across - 1)) {
 		across += 1;
-		tiledBboxWidth = bbox.value.width + page.overlap * (across - 1);
+		tiledBboxWidth = bbox.value.width + pageSetup.overlap * (across - 1);
 	}
 
-	const height = page.height - page.margin * 2;
+	const height = pageSetup.height - pageSetup.margin * 2;
 	let tiledBboxHeight = Infinity;
 	let down = 0;
-	while (tiledBboxHeight > height * down - page.overlap * (down - 1)) {
+	while (tiledBboxHeight > height * down - pageSetup.overlap * (down - 1)) {
 		down += 1;
-		tiledBboxHeight = bbox.value.height + page.overlap * (down - 1);
+		tiledBboxHeight = bbox.value.height + pageSetup.overlap * (down - 1);
 	}
 
 	return { width, height, across, down, tiledBboxWidth, tiledBboxHeight };
@@ -76,35 +51,16 @@ const tiles = computed(() => {
 const offset = computed(() => {
 	const { width, height, across, down, tiledBboxWidth, tiledBboxHeight } = tiles.value;
 	return {
-		x: (width * across - tiledBboxWidth - page.overlap * (across - 1)) / 2,
-		y: (height * down - tiledBboxHeight - page.overlap * (down - 1)) / 2,
+		x: (width * across - tiledBboxWidth - pageSetup.overlap * (across - 1)) / 2,
+		y: (height * down - tiledBboxHeight - pageSetup.overlap * (down - 1)) / 2,
 	};
-});
-
-onMounted(async () => {
-	if (files.length === 0) {
-		const stored = await idbGet<{ page: PageSetup; files: FileState[] }>(STORED_STATE_KEY);
-
-		if (stored) {
-			Object.assign(page, stored.page);
-
-			for (const state of stored.files) {
-				URL.revokeObjectURL(state.img.src);
-				const img = await loadImage(state.file);
-				state.img = img;
-				state.img.src = img.src;
-			}
-			files.splice(0, Infinity);
-			files.push(...stored.files);
-		}
-	}
 });
 
 async function handleFileSelection(selection: File[]) {
 	document.startViewTransition(async () => {
 		for (const file of selection) {
 			const img = await loadImage(file);
-			files.push({
+			images.push({
 				file,
 				img,
 				width: img.width,
@@ -118,21 +74,54 @@ async function handleFileSelection(selection: File[]) {
 
 function moveFile(from: number, to: number) {
 	document.startViewTransition(() => {
-		const file = files[from];
+		const file = images[from];
 		if (!file) throw new Error('NO_FILE_AT_INDEX');
-		files.splice(from, 1);
-		files.splice(to, 0, file);
+		images.splice(from, 1);
+		images.splice(to, 0, file);
 	});
 }
 
 function removeFile(file: File) {
 	document.startViewTransition(async () => {
-		const state = files.find(state => state.file === file);
-		if (!state?.img.src) throw new Error('MISSING_FILE_SRC');
-		URL.revokeObjectURL(state.img.src);
-		const index = files.indexOf(state);
-		files.splice(index, 1);
+		const image = images.find(image => image.file === file);
+		if (!image?.img.src) throw new Error('MISSING_FILE_SRC');
+		URL.revokeObjectURL(image.img.src);
+		const index = images.indexOf(image);
+		images.splice(index, 1);
 	});
+}
+
+const dragInProgress = reactive({
+	image: null as typeof images[number] | null,
+	x: 0,
+	y: 0,
+});
+
+const handleImageDrag = createDragHandler((down, drag, release) => {
+	if (down.target instanceof SVGImageElement) {
+		const index = parseFloat(down.target.getAttribute('data-index') ?? '');
+		dragInProgress.image = images[index] ?? null;
+	}
+
+	if (drag) {
+		dragInProgress.x += drag.movementX;
+		dragInProgress.y += drag.movementY;
+	}
+
+	if (release) {
+		document.startViewTransition(async () => {
+			const apply = release instanceof PointerEvent || release.key === 'Enter';
+			if (dragInProgress.image && apply) {
+				dragInProgress.image.x += dragInProgress.x;
+				dragInProgress.image.y += dragInProgress.y;
+			}
+			Object.assign(dragInProgress, { image: null, x: 0, y: 0 });
+		});
+	}
+});
+
+function handleSave() {
+	alert('TODO');
 }
 </script>
 
@@ -140,52 +129,52 @@ function removeFile(file: File) {
 	<fieldset>
 		<legend>Files</legend>
 
-		<table v-if="files.length !== 0">
+		<table v-if="images.length !== 0">
 			<tbody>
-				<tr v-for="state, i in files" :key="state.img.src" :style="`view-transition-name: ${state.file.name.replace(/\W/g, '')};`">
+				<tr v-for="image, i in images" :key="image.img.src" :style="`view-transition-name: row-${image.file.name.replace(/\W/g, '')};`">
 					<td style="scale: 0.6;">
 						<button type="button" :disabled="i === 0" @click="moveFile(i, i - 1)">
 							↑
 						</button>
 						<br>
-						<button type="button" :disabled="i === files.length - 1" @click="moveFile(i, i + 1)">
+						<button type="button" :disabled="i === images.length - 1" @click="moveFile(i, i + 1)">
 							↓
 						</button>
 					</td>
 					<td>
-						<img :src="state.img.src" height="32">
+						<img :src="image.img.src" height="32">
 					</td>
 					<td>
-						{{ state.file.name }}
+						{{ image.file.name }}
 					</td>
 					<td>
-						<UnitInput v-model="state.x">x</UnitInput>
+						<UnitInput v-model="image.x">x</UnitInput>
 					</td>
 					<td>
-						<UnitInput v-model="state.y">y</UnitInput>
+						<UnitInput v-model="image.y">y</UnitInput>
 					</td>
 					<td>
-						<UnitInput v-model="state.width">
+						<UnitInput v-model="image.width">
 							w
 							<template #after>
-								<button type="button" @click="state.width = state.height * state.img.naturalWidth / state.img.naturalHeight">
+								<button type="button" @click="image.width = image.height * image.img.naturalWidth / image.img.naturalHeight">
 									⧉
 								</button>
 							</template>
 						</UnitInput>
 					</td>
 					<td>
-						<UnitInput v-model="state.height">
+						<UnitInput v-model="image.height">
 							h
 							<template #after>
-								<button type="button" @click="state.height = state.width * state.img.naturalHeight / state.img.naturalWidth">
+								<button type="button" @click="image.height = image.width * image.img.naturalHeight / image.img.naturalWidth">
 									⧉
 								</button>
 							</template>
 						</UnitInput>
 					</td>
 					<td>
-						<button type="button" @click="removeFile(state.file)">
+						<button type="button" @click="removeFile(image.file)">
 							&times;
 						</button>
 					</td>
@@ -200,11 +189,11 @@ function removeFile(file: File) {
 
 	<fieldset>
 		<legend>Page</legend>
-		<UnitInput v-model="page.width">Width</UnitInput>&ensp;
-		<UnitInput v-model="page.height">Height</UnitInput>&ensp;
-		<UnitInput v-model="page.margin">Margin</UnitInput>&ensp;
-		<UnitInput v-model="page.overlap">Overlap</UnitInput>&ensp;
-		<button type="button" @click="() => [page.width, page.height] = [page.height, page.width]">
+		<UnitInput v-model="pageSetup.width">Width</UnitInput>&ensp;
+		<UnitInput v-model="pageSetup.height">Height</UnitInput>&ensp;
+		<UnitInput v-model="pageSetup.margin">Margin</UnitInput>&ensp;
+		<UnitInput v-model="pageSetup.overlap">Overlap</UnitInput>&ensp;
+		<button type="button" @click="() => [pageSetup.width, pageSetup.height] = [pageSetup.height, pageSetup.width]">
 			Rotate
 		</button>
 	</fieldset>
@@ -213,11 +202,10 @@ function removeFile(file: File) {
 		<legend>Output</legend>
 
 		<svg
-			v-if="files.length !== 0"
-			:viewBox="`0 0 ${page.width * tiles.across} ${page.height * tiles.down}`"
-			:width="page.width * tiles.across"
-			:height="page.height * tiles.down"
-			style="height: auto; max-width: 100%;"
+			v-if="images.length !== 0"
+			:viewBox="`0 0 ${pageSetup.width * tiles.across} ${pageSetup.height * tiles.down}`"
+			:width="pageSetup.width * tiles.across"
+			:height="pageSetup.height * tiles.down"
 		>
 			<defs>
 				<svg
@@ -225,16 +213,20 @@ function removeFile(file: File) {
 					:viewBox="`${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`"
 					:width="bbox.width"
 					:height="bbox.height"
+					style="overflow: visible;"
 				>
 					<image
-						v-for="file in files"
-						:key="file.img.src"
-						:href="file.img.src"
-						:x="file.x"
-						:y="file.y"
-						:width="file.width"
-						:height="file.height"
+						v-for="image, i in images"
+						:key="image.img.src"
+						:href="image.img.src"
+						:x="image.x + (image === dragInProgress.image ? dragInProgress.x : 0)"
+						:y="image.y + (image === dragInProgress.image ? dragInProgress.y : 0)"
+						:width="image.width"
+						:height="image.height"
 						preserveAspectRatio="none"
+						class="image"
+						:data-index="i"
+						@pointerdown="handleImageDrag"
 					/>
 				</svg>
 			</defs>
@@ -243,15 +235,16 @@ function removeFile(file: File) {
 				<g v-for="_x, x in tiles.across" :key="`${x},${y}`">
 					<rect
 						class="page-outline"
-						:x="x * page.width"
-						:y="y * page.height"
-						:width="page.width"
-						:height="page.height"
+						:x="x * pageSetup.width"
+						:y="y * pageSetup.height"
+						:width="pageSetup.width"
+						:height="pageSetup.height"
 					/>
 
 					<svg
-						:x="x * page.width + page.margin"
-						:y="y * page.height + page.margin"
+						class="tile"
+						:x="x * pageSetup.width + pageSetup.margin"
+						:y="y * pageSetup.height + pageSetup.margin"
 						:width="tiles.width"
 						:height="tiles.height"
 					>
@@ -265,52 +258,62 @@ function removeFile(file: File) {
 
 						<use
 							:href="`#${svgId}`"
-							:x="-1 * x * tiles.width + x * page.overlap * 2 + offset.x"
-							:y="-1 * y * tiles.height + y * page.overlap * 2 + offset.y"
+							:x="-1 * x * tiles.width + x * pageSetup.overlap * 2 + offset.x"
+							:y="-1 * y * tiles.height + y * pageSetup.overlap * 2 + offset.y"
 						/>
 
 						<template v-if="x !== 0">
-							<line class="cut-mark" :x1="page.overlap" y1="10%" :x2="page.overlap" y2="20%" />
-							<line class="cut-mark" :x1="page.overlap" y1="80%" :x2="page.overlap" y2="90%" />
+							<line class="cut-mark" :x1="pageSetup.overlap" y1="10%" :x2="pageSetup.overlap" y2="20%" />
+							<line class="cut-mark" :x1="pageSetup.overlap" y1="80%" :x2="pageSetup.overlap" y2="90%" />
 						</template>
 
 						<template v-if="x !== tiles.across - 1">
-							<line class="cut-mark" :x1="tiles.width - page.overlap" y1="10%" :x2="tiles.width - page.overlap" y2="20%" />
-							<line class="cut-mark" :x1="tiles.width - page.overlap" y1="80%" :x2="tiles.width - page.overlap" y2="90%" />
+							<line class="cut-mark" :x1="tiles.width - pageSetup.overlap" y1="10%" :x2="tiles.width - pageSetup.overlap" y2="20%" />
+							<line class="cut-mark" :x1="tiles.width - pageSetup.overlap" y1="80%" :x2="tiles.width - pageSetup.overlap" y2="90%" />
 						</template>
 
 						<template v-if="y !== 0">
-							<line class="cut-mark" x1="10%" :y1="page.overlap" x2="20%" :y2="page.overlap" />
-							<line class="cut-mark" x1="80%" :y1="page.overlap" x2="90%" :y2="page.overlap" />
+							<line class="cut-mark" x1="10%" :y1="pageSetup.overlap" x2="20%" :y2="pageSetup.overlap" />
+							<line class="cut-mark" x1="80%" :y1="pageSetup.overlap" x2="90%" :y2="pageSetup.overlap" />
 						</template>
 
 						<template v-if="y !== tiles.down - 1">
-							<line class="cut-mark" x1="10%" :y1="tiles.height - page.overlap" x2="20%" :y2="tiles.height - page.overlap" />
-							<line class="cut-mark" x1="80%" :y1="tiles.height - page.overlap" x2="90%" :y2="tiles.height - page.overlap" />
+							<line class="cut-mark" x1="10%" :y1="tiles.height - pageSetup.overlap" x2="20%" :y2="tiles.height - pageSetup.overlap" />
+							<line class="cut-mark" x1="80%" :y1="tiles.height - pageSetup.overlap" x2="90%" :y2="tiles.height - pageSetup.overlap" />
 						</template>
 					</svg>
 				</g>
 			</template>
 		</svg>
 		<br>
-		<button type="button">Save PDF</button>
+		<button type="button" @click="handleSave">Save PDF</button>
 	</fieldset>
 </template>
 
 <style scoped>
 svg {
 	border: 1px solid;
+	box-shadow: 2px 2px 0 -1px #0008;
 }
 
-.page-outline,
+.page-outline {
+	fill: none;
+	stroke: CurrentColor;
+	stroke-width: 0.1;
+}
+
 .tile-outline {
 	fill: none;
 	stroke: CurrentColor;
 	stroke-width: 1;
 }
 
+.image {
+	cursor: move;
+}
+
 .cut-mark {
-	stroke: v-bind("page.cutMarkColor");
+	stroke: v-bind("pageSetup.cutMarkColor");
 	stroke-width: 2;
 }
 </style>

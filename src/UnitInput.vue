@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, defineEmits, defineProps } from 'vue';
-import { unit } from './lib/shared-state';
+import { unit } from './lib/app-state';
 
 const props = defineProps<{
 	modelValue: number;
