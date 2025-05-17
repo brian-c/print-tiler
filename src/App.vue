@@ -1,35 +1,47 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, toRaw, useId, watch } from 'vue';
-import { loadImage } from './lib/load-image';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
+import { computed, onMounted, reactive, toRaw, useId, watch } from 'vue';
+import FileSelectionButton from './FileSelectionButton.vue';
+import { loadImage } from './lib/load-image';
+import UnitInput from './UnitInput.vue';
 
-export interface FileState {
+interface PageSetup {
+	width: number;
+	height: number;
+	margin: number;
+	overlap: number;
+	cutMarkColor: string;
+}
+
+interface FileState {
 	file: File;
-	src: string;
+	img: HTMLImageElement;
 	width: number;
 	height: number;
 	x: number;
 	y: number;
 }
 
-const STORED_FILES_KEY = 'STORED_FILES';
+const STORED_STATE_KEY = 'print-tiler-state';
 
-const id = useId();
-const internal = reactive({ fileInputResetting: false });
-const page = reactive({ width: 11 * 25.4, height: 8.5 * 25.4, margin: 0.5 * 25.4 });
+const svgId = useId();
 
+const page = reactive<PageSetup>({ width: 11 * 25.4, height: 8.5 * 25.4, margin: 0.5 * 25.4, overlap: 6, cutMarkColor: 'red' });
 const files = reactive<FileState[]>([]);
-watch([files], () => idbSet(STORED_FILES_KEY, toRaw(files)));
+watch([page, files], () => idbSet(STORED_STATE_KEY, {
+	page: toRaw(page),
+	files: toRaw(files.map(state => ({ ...state, img: { src: state.img.src } }))),
+}));
 
 const bbox = computed(() => {
-	const bounds = Array.from(files).reduce((box, state) => {
+	const bounds = Array.from(files).reduce((current, file) => {
 		return [
-			Math.min(box[1], state.y),
-			Math.max(box[2], state.x + state.width),
-			Math.max(box[3], state.y + state.height),
-			Math.min(box[0], state.x),
+			Math.min(current[0], file.y),
+			Math.max(current[1], file.x + file.width),
+			Math.max(current[2], file.y + file.height),
+			Math.min(current[3], file.x),
 		] as const;
-	}, [Infinity, Infinity, -Infinity, -Infinity] as const);
+	}, [Infinity, -Infinity, -Infinity, Infinity] as const);
 
 	const [top, right, bottom, left] = bounds;
 
@@ -41,102 +53,136 @@ const bbox = computed(() => {
 	} as const;
 });
 
-const tiles = computed(() => ({
-	across: Math.ceil(bbox.value.width / (page.width - page.margin * 2)),
-	down: Math.ceil(bbox.value.height / (page.height - page.margin * 2)),
-	width: page.width - page.margin * 2,
-	height: page.height - page.margin * 2,
-}));
+const tiles = computed(() => {
+	const width = page.width - page.margin * 2;
+	let tiledBboxWidth = Infinity;
+	let across = 0;
+	while (tiledBboxWidth > width * across - page.overlap * (across - 1)) {
+		across += 1;
+		tiledBboxWidth = bbox.value.width + page.overlap * (across - 1);
+	}
+
+	const height = page.height - page.margin * 2;
+	let tiledBboxHeight = Infinity;
+	let down = 0;
+	while (tiledBboxHeight > height * down - page.overlap * (down - 1)) {
+		down += 1;
+		tiledBboxHeight = bbox.value.height + page.overlap * (down - 1);
+	}
+
+	return { width, height, across, down, tiledBboxWidth, tiledBboxHeight };
+});
+
+const offset = computed(() => {
+	const { width, height, across, down, tiledBboxWidth, tiledBboxHeight } = tiles.value;
+	return {
+		x: (width * across - tiledBboxWidth - page.overlap * (across - 1)) / 2,
+		y: (height * down - tiledBboxHeight - page.overlap * (down - 1)) / 2,
+	};
+});
 
 onMounted(async () => {
 	if (files.length === 0) {
-		const storedFiles = await idbGet<FileState[]>(STORED_FILES_KEY);
-		if (storedFiles) {
-			for (const state of storedFiles) {
-				URL.revokeObjectURL(state.src);
+		const stored = await idbGet<{ page: PageSetup; files: FileState[] }>(STORED_STATE_KEY);
+
+		if (stored) {
+			Object.assign(page, stored.page);
+
+			for (const state of stored.files) {
+				URL.revokeObjectURL(state.img.src);
 				const img = await loadImage(state.file);
-				state.src = img.src;
+				state.img = img;
+				state.img.src = img.src;
 			}
-			files.push(...storedFiles);
+			files.splice(0, Infinity);
+			files.push(...stored.files);
 		}
 	}
 });
 
-async function handleFileSelection(event: Event) {
-	if (!(event.currentTarget instanceof HTMLInputElement)) throw new Error('MISSING_INPUT');
-	if (!event.currentTarget.files) throw new Error('MISSING_INPUT_FILES');
+async function handleFileSelection(selection: File[]) {
+	document.startViewTransition(async () => {
+		for (const file of selection) {
+			const img = await loadImage(file);
+			files.push({
+				file,
+				img,
+				width: img.width,
+				height: img.height,
+				x: 0,
+				y: 0,
+			});
+		}
+	});
+}
 
-	for (const file of event.currentTarget.files) {
-		const img = await loadImage(file);
-		files.push({
-			file,
-			src: img.src,
-			width: img.width,
-			height: img.height,
-			x: img.width / -2,
-			y: img.height / -2,
-		});
-	}
-
-	internal.fileInputResetting = true;
-	await nextTick();
-	internal.fileInputResetting = false;
+function moveFile(from: number, to: number) {
+	document.startViewTransition(() => {
+		const file = files[from];
+		if (!file) throw new Error('NO_FILE_AT_INDEX');
+		files.splice(from, 1);
+		files.splice(to, 0, file);
+	});
 }
 
 function removeFile(file: File) {
-	const state = files.find(state => state.file === file);
-	if (!state?.src) throw new Error('MISSING_FILE_SRC');
-	URL.revokeObjectURL(state.src);
-	const index = files.indexOf(state);
-	files.splice(index, 1);
+	document.startViewTransition(async () => {
+		const state = files.find(state => state.file === file);
+		if (!state?.img.src) throw new Error('MISSING_FILE_SRC');
+		URL.revokeObjectURL(state.img.src);
+		const index = files.indexOf(state);
+		files.splice(index, 1);
+	});
 }
 </script>
 
 <template>
-	<section>
-		Files
-		<input v-if="!internal.fileInputResetting" type="file" multiple @change="handleFileSelection">
+	<fieldset>
+		<legend>Files</legend>
 
 		<table v-if="files.length !== 0">
 			<tbody>
-				<tr v-for="state, i in files" :key="state.src">
+				<tr v-for="state, i in files" :key="state.img.src" :style="`view-transition-name: ${state.file.name.replace(/\W/g, '')};`">
+					<td style="scale: 0.6;">
+						<button type="button" :disabled="i === 0" @click="moveFile(i, i - 1)">
+							↑
+						</button>
+						<br>
+						<button type="button" :disabled="i === files.length - 1" @click="moveFile(i, i + 1)">
+							↓
+						</button>
+					</td>
 					<td>
-						<img :src="state.src" height="32">
+						<img :src="state.img.src" height="32">
 					</td>
 					<td>
 						{{ state.file.name }}
 					</td>
 					<td>
-						<label>
-							x:
-							<input v-model="state.x" type="number" class="dimension">
-						</label>
+						<UnitInput v-model="state.x">x</UnitInput>
 					</td>
 					<td>
-						<label>
-							y:
-							<input v-model="state.y" type="number" class="dimension">
-						</label>
+						<UnitInput v-model="state.y">y</UnitInput>
 					</td>
 					<td>
-						<label>
-							w:
-							<input v-model="state.width" type="number" class="dimension">
-						</label>
+						<UnitInput v-model="state.width">
+							w
+							<template #after>
+								<button type="button" @click="state.width = state.height * state.img.naturalWidth / state.img.naturalHeight">
+									⧉
+								</button>
+							</template>
+						</UnitInput>
 					</td>
 					<td>
-						<label>
-							h:
-							<input v-model="state.height" type="number" class="dimension">
-						</label>
-					</td>
-					<td>
-						<button type="button" :disabled="i === 0">
-							↑
-						</button>
-						<button type="button" :disabled="i === files.length - 1">
-							↓
-						</button>
+						<UnitInput v-model="state.height">
+							h
+							<template #after>
+								<button type="button" @click="state.height = state.width * state.img.naturalHeight / state.img.naturalWidth">
+									⧉
+								</button>
+							</template>
+						</UnitInput>
 					</td>
 					<td>
 						<button type="button" @click="removeFile(state.file)">
@@ -146,95 +192,125 @@ function removeFile(file: File) {
 				</tr>
 			</tbody>
 		</table>
-	</section>
 
-	<section>
-		Page
-		<div>
-			<label>
-				w:
-				<input v-model="page.width" type="number" class="dimension">
-			</label>
-			<label>
-				h:
-				<input v-model="page.height" type="number" class="dimension">
-			</label>
-			&emsp;
-			<label>
-				margin:
-				<input v-model="page.margin" type="number" class="dimension">
-			</label>
-		</div>
-	</section>
+		<FileSelectionButton v-slot="{ handleClick }" @select="handleFileSelection">
+			<button type="button" @click="handleClick">Add image</button>
+		</FileSelectionButton>
+	</fieldset>
 
-	<svg
-		v-if="files.length !== 0"
-		:viewBox="`0 0 ${page.width * tiles.across} ${page.height * tiles.down}`"
-		:width="page.width * tiles.across"
-		:height="page.height * tiles.down"
-	>
-		<defs>
-			<svg
-				:id="id"
-				:viewBox="`${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`"
-				:width="bbox.width"
-				:height="bbox.height"
-			>
-				<image
-					v-for="file in files"
-					:key="file.src"
-					:href="file.src"
-					:x="file.x"
-					:y="file.y"
-					:width="file.width"
-					:height="file.height"
-					preserveAspectRatio="none"
-				/>
-			</svg>
-		</defs>
+	<fieldset>
+		<legend>Page</legend>
+		<UnitInput v-model="page.width">Width</UnitInput>&ensp;
+		<UnitInput v-model="page.height">Height</UnitInput>&ensp;
+		<UnitInput v-model="page.margin">Margin</UnitInput>&ensp;
+		<UnitInput v-model="page.overlap">Overlap</UnitInput>&ensp;
+		<button type="button" @click="() => [page.width, page.height] = [page.height, page.width]">
+			Rotate
+		</button>
+	</fieldset>
 
-		<template v-for="_y, y in tiles.down" :key="y">
-			<g v-for="_x, x in tiles.across" :key="`${x}, ${y}`">
+	<fieldset>
+		<legend>Output</legend>
+
+		<svg
+			v-if="files.length !== 0"
+			:viewBox="`0 0 ${page.width * tiles.across} ${page.height * tiles.down}`"
+			:width="page.width * tiles.across"
+			:height="page.height * tiles.down"
+			style="height: auto; max-width: 100%;"
+		>
+			<defs>
 				<svg
-					:x="x * page.width + page.margin"
-					:y="y * page.height + page.margin"
-					:width="tiles.width"
-					:height="tiles.height"
+					:id="svgId"
+					:viewBox="`${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`"
+					:width="bbox.width"
+					:height="bbox.height"
 				>
-					<rect
-						x="0"
-						y="0"
-						width="100%"
-						height="100%"
-						fill="none"
-						stroke="CurrentColor"
-					/>
-
-					<use
-						:href="`#${id}`"
-						:x="-1 * x * tiles.width"
-						:y="-1 * y * tiles.height"
-						:width="bbox.width"
-						:height="bbox.height"
+					<image
+						v-for="file in files"
+						:key="file.img.src"
+						:href="file.img.src"
+						:x="file.x"
+						:y="file.y"
+						:width="file.width"
+						:height="file.height"
+						preserveAspectRatio="none"
 					/>
 				</svg>
-			</g>
-		</template>
-	</svg>
+			</defs>
+
+			<template v-for="_y, y in tiles.down" :key="y">
+				<g v-for="_x, x in tiles.across" :key="`${x},${y}`">
+					<rect
+						class="page-outline"
+						:x="x * page.width"
+						:y="y * page.height"
+						:width="page.width"
+						:height="page.height"
+					/>
+
+					<svg
+						:x="x * page.width + page.margin"
+						:y="y * page.height + page.margin"
+						:width="tiles.width"
+						:height="tiles.height"
+					>
+						<rect
+							class="tile-outline"
+							x="0"
+							y="0"
+							width="100%"
+							height="100%"
+						/>
+
+						<use
+							:href="`#${svgId}`"
+							:x="-1 * x * tiles.width + x * page.overlap * 2 + offset.x"
+							:y="-1 * y * tiles.height + y * page.overlap * 2 + offset.y"
+						/>
+
+						<template v-if="x !== 0">
+							<line class="cut-mark" :x1="page.overlap" y1="10%" :x2="page.overlap" y2="20%" />
+							<line class="cut-mark" :x1="page.overlap" y1="80%" :x2="page.overlap" y2="90%" />
+						</template>
+
+						<template v-if="x !== tiles.across - 1">
+							<line class="cut-mark" :x1="tiles.width - page.overlap" y1="10%" :x2="tiles.width - page.overlap" y2="20%" />
+							<line class="cut-mark" :x1="tiles.width - page.overlap" y1="80%" :x2="tiles.width - page.overlap" y2="90%" />
+						</template>
+
+						<template v-if="y !== 0">
+							<line class="cut-mark" x1="10%" :y1="page.overlap" x2="20%" :y2="page.overlap" />
+							<line class="cut-mark" x1="80%" :y1="page.overlap" x2="90%" :y2="page.overlap" />
+						</template>
+
+						<template v-if="y !== tiles.down - 1">
+							<line class="cut-mark" x1="10%" :y1="tiles.height - page.overlap" x2="20%" :y2="tiles.height - page.overlap" />
+							<line class="cut-mark" x1="80%" :y1="tiles.height - page.overlap" x2="90%" :y2="tiles.height - page.overlap" />
+						</template>
+					</svg>
+				</g>
+			</template>
+		</svg>
+		<br>
+		<button type="button">Save PDF</button>
+	</fieldset>
 </template>
 
 <style scoped>
-label:has(.dimension) {
-	white-space: nowrap;
-}
-
-.dimension {
-	field-sizing: content;
-	min-inline-size: 4ch;
-}
-
 svg {
-	border: 1px solid lime;
-	/* overflow: visible; */
+	border: 1px solid;
+}
+
+.page-outline,
+.tile-outline {
+	fill: none;
+	stroke: CurrentColor;
+	stroke-width: 1;
+}
+
+.cut-mark {
+	stroke: v-bind("page.cutMarkColor");
+	stroke-width: 2;
 }
 </style>

@@ -19,6 +19,7 @@ export default defineConfigWithVueTs(
 			'vue/html-indent': ['warn', 'tab'],
 			'vue/html-self-closing': ['warn', { html: { normal: 'never' } }],
 			'vue/max-attributes-per-line': ['warn', { singleline: { max: Infinity }, multiline: { max: 1 } }],
+			'vue/singleline-html-element-content-newline': ['off'],
 		},
 	},
 );
