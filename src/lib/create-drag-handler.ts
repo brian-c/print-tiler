@@ -9,15 +9,15 @@ export function createDragHandler<T>(
 	return function handleDown(downEvent: PointerEvent, arg?: T) {
 		downEvent.preventDefault();
 
-		function handleKey(event: KeyboardEvent) {
-			if (['Escape', 'Enter'].includes(event.key)) handleRelease(event);
-		}
-
 		addEventListener('keydown', handleKey);
 		addEventListener('pointermove', handleDrag);
 		addEventListener('pointerup', handleRelease);
 
 		handler(downEvent, null, null, arg);
+
+		function handleKey(event: KeyboardEvent) {
+			if (['Escape', 'Enter'].includes(event.key)) handleRelease(event);
+		}
 
 		function handleDrag(moveEvent: PointerEvent) {
 			handler(downEvent, moveEvent, null, arg);

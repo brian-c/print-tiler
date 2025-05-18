@@ -60,6 +60,15 @@ if (storedState) {
 	}
 }
 
+watch([images], () => {
+	const minX = Math.min(...images.map(image => image.x));
+	const minY = Math.min(...images.map(image => image.y));
+	for (const image of images) {
+		image.x -= minX;
+		image.y -= minY;
+	}
+});
+
 watch([pageSetup, images, unit], () => idbSet(STORED_STATE_KEY, {
 	pageSetup: toRaw(pageSetup),
 	images: toRaw(images.map(state => ({ ...state, img: { src: state.img.src } }))),
