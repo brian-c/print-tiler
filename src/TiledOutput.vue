@@ -143,24 +143,54 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 						:y="-1 * y * tiles.height + y * pageSetup.overlap * 2 + offset.y"
 					/>
 
-					<template v-if="x !== 0">
-						<line class="cut-mark" :x1="pageSetup.overlap" y1="10%" :x2="pageSetup.overlap" y2="20%" />
-						<line class="cut-mark" :x1="pageSetup.overlap" y1="80%" :x2="pageSetup.overlap" y2="90%" />
-					</template>
-
-					<template v-if="x !== tiles.across - 1">
-						<line class="cut-mark" :x1="tiles.width - pageSetup.overlap" y1="10%" :x2="tiles.width - pageSetup.overlap" y2="20%" />
-						<line class="cut-mark" :x1="tiles.width - pageSetup.overlap" y1="80%" :x2="tiles.width - pageSetup.overlap" y2="90%" />
-					</template>
-
+					<!-- Top tabs -->
 					<template v-if="y !== 0">
-						<line class="cut-mark" x1="10%" :y1="pageSetup.overlap" x2="20%" :y2="pageSetup.overlap" />
-						<line class="cut-mark" x1="80%" :y1="pageSetup.overlap" x2="90%" :y2="pageSetup.overlap" />
+						<path
+							class="cut-mark"
+							:d="[
+								['M', 0, pageSetup.overlap],
+								['l', tiles.width / 10, 0],
+								['l', 0, -0.95 * pageSetup.overlap],
+								['l', tiles.width / 10, 0],
+								['l', 0, 0.95 * pageSetup.overlap],
+								['L', tiles.width - tiles.width / 5, pageSetup.overlap],
+								['l', 0, -0.95 * pageSetup.overlap],
+								['l', tiles.width / 10, 0],
+								['l', 0, 0.95 * pageSetup.overlap],
+								['L', tiles.width, pageSetup.overlap],
+							].map(pair => `${pair[0]} ${pair.slice(1).join(',')}`).join(' ')"
+						/>
 					</template>
 
+					<!-- Right slots -->
+					<template v-if="x !== tiles.across - 1">
+						<line class="cut-mark slot" :x1="tiles.width - pageSetup.overlap" y1="10%" :x2="tiles.width - pageSetup.overlap" y2="20%" />
+						<line class="cut-mark slot" :x1="tiles.width - pageSetup.overlap" y1="80%" :x2="tiles.width - pageSetup.overlap" y2="90%" />
+					</template>
+
+					<!-- Bottom slots -->
 					<template v-if="y !== tiles.down - 1">
-						<line class="cut-mark" x1="10%" :y1="tiles.height - pageSetup.overlap" x2="20%" :y2="tiles.height - pageSetup.overlap" />
-						<line class="cut-mark" x1="80%" :y1="tiles.height - pageSetup.overlap" x2="90%" :y2="tiles.height - pageSetup.overlap" />
+						<line class="cut-mark slot" x1="10%" :y1="tiles.height - pageSetup.overlap" x2="20%" :y2="tiles.height - pageSetup.overlap" />
+						<line class="cut-mark slot" x1="80%" :y1="tiles.height - pageSetup.overlap" x2="90%" :y2="tiles.height - pageSetup.overlap" />
+					</template>
+
+					<!-- Left tabs -->
+					<template v-if="x !== 0">
+						<path
+							class="cut-mark"
+							:d="[
+								['M', pageSetup.overlap, 0],
+								['l', 0, tiles.height / 10],
+								['l', -0.95 * pageSetup.overlap, 0],
+								['l', 0, tiles.height / 10],
+								['l', 0.95 * pageSetup.overlap, 0],
+								['L', pageSetup.overlap, tiles.height - tiles.height / 5],
+								['l', -0.95 * pageSetup.overlap, 0],
+								['l', 0, tiles.height / 10],
+								['l', 0.95 * pageSetup.overlap, 0],
+								['L', pageSetup.overlap, tiles.height],
+							].map(pair => `${pair[0]} ${pair.slice(1).join(',')}`).join(' ')"
+						/>
 					</template>
 				</svg>
 			</template>
@@ -202,13 +232,6 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 	grid-template-rows: repeat(v-bind("tiles.down"), auto);
 	justify-content: center;
 	justify-items: center;
-
-	/* & {
-		outline: 1px dashed;
-		overflow: hidden;
-		padding: 2px;
-		resize: both;
-	} */
 }
 
 .sheet {
@@ -230,8 +253,13 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 }
 
 .cut-mark {
+	fill: none;
 	stroke: v-bind("pageSetup.cutMarkColor");
-	stroke-width: 0.1mm;
+	stroke-width: 1;
+
+	@media print {
+		stroke-width: 0.1mm;
+	}
 }
 
 .draggable {

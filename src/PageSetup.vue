@@ -10,34 +10,42 @@ import UnitInput from './UnitInput.vue';
 			<tbody>
 				<tr>
 					<th>
-						<label for="page-steup-width">Width</label>
+						<label for="page-setup-width">Width</label>
 					</th>
 					<td>
-						<UnitInput id="page-steup-width" v-model="pageSetup.width" />
+						<UnitInput id="page-setup-width" v-model="pageSetup.width" />
 					</td>
 				</tr>
 				<tr>
 					<th>
-						<label for="page-steup-height">Height</label>
+						<label for="page-setup-height">Height</label>
 					</th>
 					<td>
-						<UnitInput id="page-steup-height" v-model="pageSetup.height" />
+						<UnitInput id="page-setup-height" v-model="pageSetup.height" />
 					</td>
 				</tr>
 				<tr>
 					<th>
-						<label for="page-steup-margin">Margin</label>
+						<label for="page-setup-margin">Margin</label>
 					</th>
 					<td>
-						<UnitInput id="page-steup-margin" v-model="pageSetup.margin" />
+						<UnitInput id="page-setup-margin" v-model="pageSetup.margin" />
 					</td>
 				</tr>
 				<tr>
 					<th>
-						<label for="page-steup-overlap">Overlap</label>
+						<label for="page-setup-overlap">Overlap</label>
 					</th>
 					<td>
-						<UnitInput id="page-steup-overlap" v-model="pageSetup.overlap" />
+						<UnitInput id="page-setup-overlap" v-model="pageSetup.overlap" />
+					</td>
+				</tr>
+				<tr>
+					<th>
+						<label for="page-setup-overlap">Cut lines</label>
+					</th>
+					<td>
+						<input id="page-setup-cut-color" v-model="pageSetup.cutMarkColor" type="color" />
 					</td>
 				</tr>
 			</tbody>

@@ -30,6 +30,7 @@ function handlePrintClick() {
 @media screen {
 	.layout {
 		display: flex;
+		flex-wrap: wrap;
 	}
 
 	.controls {
@@ -38,7 +39,7 @@ function handlePrintClick() {
 	}
 
 	.preview {
-		flex: 3;
+		flex: 3 0 50%;
 	}
 }
 </style>
