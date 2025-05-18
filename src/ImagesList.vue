@@ -5,15 +5,23 @@ import { loadImage } from './lib/load-image';
 import startViewTransition from './lib/start-view-transition';
 import UnitInput from './UnitInput.vue';
 
+function getPpi(image: typeof images[number]) {
+	return Array.from(new Set([
+		parseFloat((image.img.naturalWidth / (image.width / 25.4)).toFixed(2)),
+		parseFloat((image.img.naturalHeight / (image.height / 25.4)).toFixed(2)),
+	]));
+}
+
 async function handleFileSelection(selection: File[]) {
 	startViewTransition(async () => {
 		for (const file of selection) {
 			const img = await loadImage(file);
+			const resolution = img.width > 600 ? 300 : 96;
 			images.push({
 				file,
 				img,
-				width: img.width,
-				height: img.height,
+				width: img.width / (resolution / 25.4),
+				height: img.height / (resolution / 25.4),
 				x: 0,
 				y: 0,
 			});
@@ -111,6 +119,10 @@ function removeFile(file: File) {
 								</template>
 							</UnitInput>
 						</td>
+					</tr>
+					<tr>
+						<th>PPI</th>
+						<td>{{ getPpi(image).join(' &times; ') }}</td>
 					</tr>
 				</details>
 			</li>

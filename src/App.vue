@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ImagesList from './ImagesList.vue';
+import { images } from './lib/app-state';
 import media from './media.module.css';
 import PageSetup from './PageSetup.vue';
 import TiledOutput from './TiledOutput.vue';
@@ -21,7 +22,7 @@ function handlePrintClick() {
 		</div>
 
 		<div class="preview">
-			<TiledOutput />
+			<TiledOutput v-if="images.length !== 0" />
 		</div>
 	</div>
 </template>

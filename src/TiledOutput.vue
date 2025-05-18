@@ -103,23 +103,25 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 							:height="pageSetup.height - pageSetup.margin * 2"
 						/>
 
-						<rect
-							v-for="image, i in images"
-							:key="image.img.src"
-							:x="(offset.x + pageSetup.margin + image.x) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.x : 0)"
-							:y="(offset.y + pageSetup.margin + image.y) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.y : 0)"
-							:width="image.width"
-							:height="image.height"
-							class="draggable"
-							:class="{
-								hover: image === dragInProgress.hovered && !dragInProgress.image,
-								active: image === dragInProgress.image,
-							}"
-							:data-index="i"
-							@pointerenter="dragInProgress.hovered = image"
-							@pointerleave="dragInProgress.hovered = null"
-							@pointerdown="handleImageDrag"
-						/>
+						<template v-if="images.length > 1">
+							<rect
+								v-for="image, i in images"
+								:key="image.img.src"
+								:x="(offset.x + pageSetup.margin + image.x) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.x : 0)"
+								:y="(offset.y + pageSetup.margin + image.y) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.y : 0)"
+								:width="image.width"
+								:height="image.height"
+								class="draggable"
+								:class="{
+									hover: image === dragInProgress.hovered && !dragInProgress.image,
+									active: image === dragInProgress.image,
+								}"
+								:data-index="i"
+								@pointerenter="dragInProgress.hovered = image"
+								@pointerleave="dragInProgress.hovered = null"
+								@pointerdown="handleImageDrag"
+							/>
+						</template>
 
 					</svg>
 				</template>

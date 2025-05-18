@@ -32,7 +32,7 @@ export const pageSetup = reactive({
 	height: 8.5 * 25.4,
 	margin: 0.5 * 25.4,
 	overlap: 0.25 * 25.4,
-	cutMarkColor: 'red',
+	cutMarkColor: '#ff0000',
 });
 
 export const images = reactive<ImageState[]>([]);
