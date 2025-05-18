@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, defineEmits, defineProps } from 'vue';
+import { computed } from 'vue';
 import { unit } from './lib/app-state';
+
+defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{
 	modelValue: number;
@@ -28,7 +30,7 @@ const internalValue = computed({
 		<component :is="$slots['default'] ? 'label' : 'span' " class="label">
 			<slot></slot>
 
-			<input v-model="internalValue" type="number" :step="unit === 'in' ? 1 / 8 : 1">
+			<input v-model="internalValue" type="number" :step="unit === 'in' ? 1 / 8 : 1" v-bind="$attrs">
 		</component>
 
 		<select v-model="unit" aria-label="Unit">

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue';
 
+defineOptions({ inheritAttrs: false });
+
 const emit = defineEmits<{
 	select: [File[]];
 }>();
@@ -28,7 +30,8 @@ async function handleFileSelection(event: Event) {
 	<slot :handle-click="handleClick">
 		<button type="button" @click="handleClick">Pick a file</button>
 	</slot>
-	<input v-if="!resetting" ref="input" type="file" multiple @change="handleFileSelection">
+
+	<input v-if="!resetting" ref="input" type="file" multiple v-bind="$attrs" @change="handleFileSelection">
 </template>
 
 <style scoped>

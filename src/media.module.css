@@ -1,0 +1,11 @@
+@media not screen {
+	.screenOnly {
+		display: none;
+	}
+}
+
+@media not print {
+	.printOnly {
+		display: none;
+	}
+}
