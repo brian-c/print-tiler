@@ -32,6 +32,7 @@ function handlePrintClick() {
 	.layout {
 		display: flex;
 		flex-wrap: wrap;
+		gap: 4px;
 	}
 
 	.controls {

@@ -58,17 +58,52 @@ const dragInProgress = reactive({
 	image: null as typeof images[number] | null,
 	x: 0,
 	y: 0,
+	width: 0,
+	height: 0,
 });
 
-const handleImageDrag = createDragHandler((down, drag, release) => {
-	if (down.currentTarget instanceof SVGRectElement) {
-		const index = parseFloat(down.currentTarget.getAttribute('data-index') ?? '');
-		dragInProgress.image = images[index] ?? null;
-	}
+const handleImageDrag = createDragHandler((
+	_down,
+	drag,
+	release,
+	image: typeof images[number],
+	corner?: number,
+) => {
+	dragInProgress.image = image;
 
 	if (drag) {
-		dragInProgress.x += drag.movementX;
-		dragInProgress.y += drag.movementY;
+		if (corner === 0) {
+			dragInProgress.x += drag.movementX;
+			dragInProgress.y += drag.movementY;
+			dragInProgress.height -= drag.movementY;
+			dragInProgress.width -= drag.movementX;
+		} else if (corner === 1) {
+			dragInProgress.y += drag.movementY;
+			dragInProgress.height -= drag.movementY;
+			dragInProgress.width += drag.movementX;
+		} else if (corner === 2) {
+			dragInProgress.height += drag.movementY;
+			dragInProgress.width += drag.movementX;
+		} else if (corner === 3) {
+			dragInProgress.x += drag.movementX;
+			dragInProgress.height += drag.movementY;
+			dragInProgress.width -= drag.movementX;
+		} else {
+			dragInProgress.x += drag.movementX;
+			dragInProgress.y += drag.movementY;
+		}
+
+		// If we go negative, just bail for now.
+
+		if (image.width + dragInProgress.width < 0) {
+			dragInProgress.x = 0;
+			dragInProgress.width = 0;
+		}
+
+		if (image.height + dragInProgress.height < 0) {
+			dragInProgress.y = 0;
+			dragInProgress.height = 0;
+		}
 	}
 
 	if (release) {
@@ -77,8 +112,10 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 			if (dragInProgress.image && apply) {
 				dragInProgress.image.x += dragInProgress.x;
 				dragInProgress.image.y += dragInProgress.y;
+				dragInProgress.image.width += dragInProgress.width;
+				dragInProgress.image.height += dragInProgress.height;
 			}
-			Object.assign(dragInProgress, { image: null, x: 0, y: 0 });
+			Object.assign(dragInProgress, { image: null, x: 0, y: 0, width: 0, height: 0 });
 		});
 	}
 });
@@ -104,25 +141,37 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 						/>
 
 						<template v-if="images.length > 1">
-							<rect
-								v-for="image, i in images"
+							<g
+								v-for="image in images"
 								:key="image.img.src"
-								:x="(offset.x + pageSetup.margin + image.x) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.x : 0)"
-								:y="(offset.y + pageSetup.margin + image.y) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.y : 0)"
-								:width="image.width"
-								:height="image.height"
-								class="draggable"
-								:class="{
-									hover: image === dragInProgress.hovered && !dragInProgress.image,
-									active: image === dragInProgress.image,
-								}"
-								:data-index="i"
 								@pointerenter="dragInProgress.hovered = image"
 								@pointerleave="dragInProgress.hovered = null"
-								@pointerdown="handleImageDrag"
-							/>
-						</template>
+							>
+								<rect
+									:x="(offset.x + pageSetup.margin + image.x) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.x : 0)"
+									:y="(offset.y + pageSetup.margin + image.y) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.y : 0)"
+									:width="image.width + dragInProgress.width"
+									:height="image.height + dragInProgress.height"
+									class="drag-handle"
+									:class="{
+										hover: image === dragInProgress.hovered && !dragInProgress.image,
+										active: image === dragInProgress.image,
+									}"
+									@pointerdown="handleImageDrag($event, image)"
+								/>
 
+								<g :opacity="image === dragInProgress.hovered && !dragInProgress.image ? 1 : 0">
+									<template v-for="[cx, cy], ci of [[0, 0], [1, 0], [1, 1], [0, 1]] as const" :key="[cx, cy]">
+										<circle
+											class="resize-handle"
+											:cx="(offset.x + pageSetup.margin + image.x + cx * image.width) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.x : 0)"
+											:cy="(offset.y + pageSetup.margin + image.y + cy * image.height) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.y : 0)"
+											@pointerdown="handleImageDrag($event, image, ci)"
+										/>
+									</template>
+								</g>
+							</g>
+						</template>
 					</svg>
 				</template>
 			</template>
@@ -148,7 +197,7 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 					<!-- Top tabs -->
 					<template v-if="y !== 0">
 						<path
-							class="cut-mark"
+							class="cut-line"
 							:d="[
 								['M', 0, pageSetup.overlap],
 								['l', tiles.width / 10, 0],
@@ -166,20 +215,20 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 
 					<!-- Right slots -->
 					<template v-if="x !== tiles.across - 1">
-						<line class="cut-mark slot" :x1="tiles.width - pageSetup.overlap" y1="10%" :x2="tiles.width - pageSetup.overlap" y2="20%" />
-						<line class="cut-mark slot" :x1="tiles.width - pageSetup.overlap" y1="80%" :x2="tiles.width - pageSetup.overlap" y2="90%" />
+						<line class="cut-line slot" :x1="tiles.width - pageSetup.overlap" y1="10%" :x2="tiles.width - pageSetup.overlap" y2="20%" />
+						<line class="cut-line slot" :x1="tiles.width - pageSetup.overlap" y1="80%" :x2="tiles.width - pageSetup.overlap" y2="90%" />
 					</template>
 
 					<!-- Bottom slots -->
 					<template v-if="y !== tiles.down - 1">
-						<line class="cut-mark slot" x1="10%" :y1="tiles.height - pageSetup.overlap" x2="20%" :y2="tiles.height - pageSetup.overlap" />
-						<line class="cut-mark slot" x1="80%" :y1="tiles.height - pageSetup.overlap" x2="90%" :y2="tiles.height - pageSetup.overlap" />
+						<line class="cut-line slot" x1="10%" :y1="tiles.height - pageSetup.overlap" x2="20%" :y2="tiles.height - pageSetup.overlap" />
+						<line class="cut-line slot" x1="80%" :y1="tiles.height - pageSetup.overlap" x2="90%" :y2="tiles.height - pageSetup.overlap" />
 					</template>
 
 					<!-- Left tabs -->
 					<template v-if="x !== 0">
 						<path
-							class="cut-mark"
+							class="cut-line"
 							:d="[
 								['M', pageSetup.overlap, 0],
 								['l', 0, tiles.height / 10],
@@ -213,8 +262,8 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 				:href="image.img.src"
 				:x="image.x + (image === dragInProgress.image ? dragInProgress.x : 0)"
 				:y="image.y + (image === dragInProgress.image ? dragInProgress.y : 0)"
-				:width="image.width"
-				:height="image.height"
+				:width="image.width + (image === dragInProgress.image ? dragInProgress.width : 0)"
+				:height="image.height + (image === dragInProgress.image ? dragInProgress.height : 0)"
 				preserveAspectRatio="none"
 				class="image"
 				:data-index="i"
@@ -240,21 +289,18 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 	aspect-ratio: v-bind("pageSetup.width") / v-bind("pageSetup.height");
 	background: white;
 	border: 1px solid;
-	box-shadow: 2px 2px 0 -1px;
+	box-shadow: 2px 2px 0 -1px #0003;
+	box-sizing: border-box;
 	display: block;
 	height: auto;
 	width: 100%;
-
-	.sheets.is-short > & {
-		color: red;
-	}
 }
 
 .tile {
 	break-after: page;
 }
 
-.cut-mark {
+.cut-line {
 	fill: none;
 	stroke: v-bind("pageSetup.cutMarkColor");
 	stroke-width: 1;
@@ -264,7 +310,7 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 	}
 }
 
-.draggable {
+.drag-handle {
 	cursor: move;
 	fill: transparent;
 	stroke: transparent;
@@ -276,6 +322,23 @@ const handleImageDrag = createDragHandler((down, drag, release) => {
 
 	&.active {
 		stroke: ActiveText;
+	}
+}
+
+.resize-handle {
+	fill: color-mix(in srgb, ActiveText 20%, transparent);
+	r: 4px;
+	stroke: ActiveText;
+	stroke-width: 1px;
+
+	&:nth-of-type(1),
+	&:nth-of-type(3) {
+		cursor: nwse-resize;
+	}
+
+	&:nth-of-type(2),
+	&:nth-of-type(4) {
+		cursor: nesw-resize;
 	}
 }
 </style>
