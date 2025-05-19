@@ -82,58 +82,62 @@ function removeFile(file: File) {
 						</div>
 					</summary>
 
-					<tr>
-						<th>Left</th>
-						<td>
-							<UnitInput v-model="image.x" />
-						</td>
-					</tr>
+					<table>
+						<tbody>
+							<tr>
+								<th>Left</th>
+								<td>
+									<UnitInput v-model="image.x" />
+								</td>
+							</tr>
 
-					<tr>
-						<th>Top</th>
-						<td>
-							<UnitInput v-model="image.y" />
-						</td>
-					</tr>
+							<tr>
+								<th>Top</th>
+								<td>
+									<UnitInput v-model="image.y" />
+								</td>
+							</tr>
 
-					<tr>
-						<th>Width</th>
-						<td>
-							<UnitInput v-model="image.width">
-								<template v-if="getPpi(image).length === 2" #after>
-									<button
-										type="button"
-										aria-label="Fix aspect ratio horizontally"
-										@click="image.width = image.height * image.img.naturalWidth / image.img.naturalHeight"
-									>
-										⧉
-									</button>
-								</template>
-							</UnitInput>
-						</td>
-					</tr>
+							<tr>
+								<th>Width</th>
+								<td>
+									<UnitInput v-model="image.width">
+										<template v-if="getPpi(image).length === 2" #after>
+											<button
+												type="button"
+												aria-label="Fix aspect ratio horizontally"
+												@click="image.width = image.height * image.img.naturalWidth / image.img.naturalHeight"
+											>
+												⧉
+											</button>
+										</template>
+									</UnitInput>
+								</td>
+							</tr>
 
-					<tr>
-						<th>Height</th>
-						<td>
-							<UnitInput v-model="image.height">
-								<template v-if="getPpi(image).length === 2" #after>
-									<button
-										type="button"
-										aria-label="Fix aspect ratio vertically"
-										@click="image.height = image.width * image.img.naturalHeight / image.img.naturalWidth"
-									>
-										⧉
-									</button>
-								</template>
-							</UnitInput>
-						</td>
-					</tr>
+							<tr>
+								<th>Height</th>
+								<td>
+									<UnitInput v-model="image.height">
+										<template v-if="getPpi(image).length === 2" #after>
+											<button
+												type="button"
+												aria-label="Fix aspect ratio vertically"
+												@click="image.height = image.width * image.img.naturalHeight / image.img.naturalWidth"
+											>
+												⧉
+											</button>
+										</template>
+									</UnitInput>
+								</td>
+							</tr>
 
-					<tr>
-						<th>PPI</th>
-						<td>{{ getPpi(image).join(' &times; ') }}</td>
-					</tr>
+							<tr>
+								<th>PPI</th>
+								<td>{{ getPpi(image).join(' &times; ') }}</td>
+							</tr>
+						</tbody>
+					</table>
 				</details>
 			</li>
 		</ul>
