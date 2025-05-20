@@ -55,110 +55,119 @@ function removeFile(file: File) {
 
 		<ul v-if="images.length !== 0">
 			<li v-for="image, i in images" :key="image.img.src" :style="`view-transition-name: row-${image.file.name.replace(/\W/g, '')};`">
-				<details>
-					<summary>
-						<div style="scale: 0.6;">
-							<button type="button" :disabled="i === 0" aria-label="Send back" @click="moveFile(i, i - 1)">
-								↑
-							</button>
-							<br>
-							<button type="button" :disabled="i === images.length - 1" aria-label="Bring forward" @click="moveFile(i, i + 1)">
-								↓
-							</button>
-						</div>
+				<div class="header">
+					<div style="scale: 0.8;">
+						<button type="button" :disabled="i === 0" aria-label="Send back" @click="moveFile(i, i - 1)">
+							▲
+						</button>
+						<br>
+						<button type="button" :disabled="i === images.length - 1" aria-label="Bring forward" @click="moveFile(i, i + 1)">
+							▼
+						</button>
+					</div>
 
-						<div>
-							<img :src="image.img.src" height="32">
-						</div>
+					<div>
+						<img :src="image.img.src" height="32">
+					</div>
 
-						<div>
-							{{ image.file.name }}
-						</div>
+					<div>
+						{{ image.file.name }}
+					</div>
 
-						<div>
-							<button type="button" aria-label="Remove" @click="removeFile(image.file)">
-								&times;
-							</button>
-						</div>
-					</summary>
+					<div>
+						<button type="button" aria-label="Remove" @click="removeFile(image.file)">
+							✕
+						</button>
+					</div>
+				</div>
 
-					<table>
-						<tbody>
-							<tr>
-								<th>Left</th>
-								<td>
-									<UnitInput v-model="image.x" />
-								</td>
-							</tr>
+				<table>
+					<tbody>
+						<tr>
+							<th>Left</th>
+							<td>
+								<UnitInput v-model="image.x" />
+							</td>
+						</tr>
 
-							<tr>
-								<th>Top</th>
-								<td>
-									<UnitInput v-model="image.y" />
-								</td>
-							</tr>
+						<tr>
+							<th>Top</th>
+							<td>
+								<UnitInput v-model="image.y" />
+							</td>
+						</tr>
 
-							<tr>
-								<th>Width</th>
-								<td>
-									<UnitInput v-model="image.width">
-										<template v-if="getPpi(image).length === 2" #after>
-											<button
-												type="button"
-												aria-label="Fix aspect ratio horizontally"
-												@click="image.width = image.height * image.img.naturalWidth / image.img.naturalHeight"
-											>
-												⧉
-											</button>
-										</template>
-									</UnitInput>
-								</td>
-							</tr>
+						<tr>
+							<th>Width</th>
+							<td>
+								<UnitInput v-model="image.width">
+									<template v-if="getPpi(image).length === 2" #after>
+										<button
+											type="button"
+											aria-label="Fix aspect ratio horizontally"
+											@click="image.width = image.height * image.img.naturalWidth / image.img.naturalHeight"
+										>
+											⧉
+										</button>
+									</template>
+								</UnitInput>
+							</td>
+						</tr>
 
-							<tr>
-								<th>Height</th>
-								<td>
-									<UnitInput v-model="image.height">
-										<template v-if="getPpi(image).length === 2" #after>
-											<button
-												type="button"
-												aria-label="Fix aspect ratio vertically"
-												@click="image.height = image.width * image.img.naturalHeight / image.img.naturalWidth"
-											>
-												⧉
-											</button>
-										</template>
-									</UnitInput>
-								</td>
-							</tr>
+						<tr>
+							<th>Height</th>
+							<td>
+								<UnitInput v-model="image.height">
+									<template v-if="getPpi(image).length === 2" #after>
+										<button
+											type="button"
+											aria-label="Fix aspect ratio vertically"
+											@click="image.height = image.width * image.img.naturalHeight / image.img.naturalWidth"
+										>
+											⧉
+										</button>
+									</template>
+								</UnitInput>
+							</td>
+						</tr>
 
-							<tr>
-								<th>PPI</th>
-								<td>{{ getPpi(image).join(' &times; ') }}</td>
-							</tr>
-						</tbody>
-					</table>
-				</details>
+						<tr>
+							<th>PPI</th>
+							<td>
+								<abbr v-if="getPpi(image).length !== 1" title="Out of proportion">⚠</abbr>
+								{{ getPpi(image).join(' &times; ') }}
+							</td>
+						</tr>
+					</tbody>
+				</table>
 			</li>
 		</ul>
 
-		<FileSelectionButton v-slot="{ handleClick }" accept="image/*" @select="handleFileSelection">
-			<button type="button" @click="handleClick">Add image</button>
-		</FileSelectionButton>
+		<p style="text-align: center;">
+			<FileSelectionButton v-slot="{ handleClick }" accept="image/*" @select="handleFileSelection">
+				<button type="button" @click="handleClick">Add an image</button>
+			</FileSelectionButton>
+		</p>
 	</fieldset>
 </template>
 
 <style scoped>
-summary {
-	align-items: center;
-	display: flex;
-	gap: 1ch;
-	vertical-align: middle;
-}
-
 ul {
 	list-style: none;
 	margin: 0;
 	padding: 0;
+}
+
+li:not(:first-child) {
+	border-block-start: 1px solid #8886;
+	margin-block-start: 1ch;
+	padding-block-start: 1ch;
+}
+
+.header {
+	align-items: center;
+	display: flex;
+	gap: 1ch;
+	vertical-align: middle;
 }
 </style>

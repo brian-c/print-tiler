@@ -33,12 +33,9 @@ const internalValue = computed({
 			<input v-model="internalValue" type="number" :step="unit === 'in' ? 1 / 8 : 1" v-bind="$attrs">
 		</component>
 
-		<select v-model="unit" aria-label="Unit">
-			<option value="mm">mm</option>
-			<option value="in">in</option>
-		</select>
-
-		<slot name="after"></slot>
+		<slot name="after">
+			{{ unit }}
+		</slot>
 	</span>
 </template>
 

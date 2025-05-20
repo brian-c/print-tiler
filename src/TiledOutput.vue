@@ -257,7 +257,7 @@ const handleImageDrag = createDragHandler((
 			style="overflow: visible;"
 		>
 			<image
-				v-for="image, i in images"
+				v-for="image in images"
 				:key="image.img.src"
 				:href="image.img.src"
 				:x="image.x + (image === dragInProgress.image ? dragInProgress.x : 0)"
@@ -265,9 +265,6 @@ const handleImageDrag = createDragHandler((
 				:width="image.width + (image === dragInProgress.image ? dragInProgress.width : 0)"
 				:height="image.height + (image === dragInProgress.image ? dragInProgress.height : 0)"
 				preserveAspectRatio="none"
-				class="image"
-				:data-index="i"
-				@x-pointerdown="handleImageDrag"
 			/>
 		</svg>
 	</div>

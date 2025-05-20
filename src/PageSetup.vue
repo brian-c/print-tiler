@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { pageSetup } from './lib/app-state';
+import { pageSetup, unit } from './lib/app-state';
 import UnitInput from './UnitInput.vue';
 </script>
 
@@ -13,7 +13,14 @@ import UnitInput from './UnitInput.vue';
 						<label for="page-setup-width">Width</label>
 					</th>
 					<td>
-						<UnitInput id="page-setup-width" v-model="pageSetup.width" />
+						<UnitInput id="page-setup-width" v-model="pageSetup.width">
+							<template #after>
+								<select id="page-setup-unit" v-model="unit" aria-label="Unit">
+									<option value="mm">mm</option>
+									<option value="in">in</option>
+								</select>
+							</template>
+						</UnitInput>
 					</td>
 				</tr>
 				<tr>
@@ -45,13 +52,16 @@ import UnitInput from './UnitInput.vue';
 						<label for="page-setup-overlap">Cut lines</label>
 					</th>
 					<td>
-						<input id="page-setup-cut-color" v-model="pageSetup.cutMarkColor" type="color" />
+						<input id="page-setup-cut-color" v-model="pageSetup.cutMarkColor" type="color">
 					</td>
 				</tr>
 			</tbody>
 		</table>
-		<button type="button" @click="() => [pageSetup.width, pageSetup.height] = [pageSetup.height, pageSetup.width]">
-			Rotate
-		</button>
+
+		<p style="text-align: center;">
+			<button type="button" @click="() => [pageSetup.width, pageSetup.height] = [pageSetup.height, pageSetup.width]">
+				Rotate pages
+			</button>
+		</p>
 	</fieldset>
 </template>
