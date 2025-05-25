@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue';
 import { images, pageSetup } from './lib/app-state';
-import { createDragHandler } from './lib/create-drag-handler';
+import { createDragHandler, getSvgPoint } from './lib/create-drag-handler';
 import startViewTransition from './lib/start-view-transition';
 import media from './media.module.css';
 
@@ -56,66 +56,91 @@ const offset = computed(() => {
 const dragInProgress = reactive({
 	hovered: null as typeof images[number] | null,
 	image: null as typeof images[number] | null,
-	x: 0,
-	y: 0,
-	width: 0,
-	height: 0,
+	handle: null as SVGGeometryElement | null,
+	downPoint: null as SVGPoint | null,
+	dx: 0,
+	dy: 0,
+	dWidth: 0,
+	dHeight: 0,
 });
 
 const handleImageDrag = createDragHandler((
-	_down,
+	down,
 	drag,
 	release,
 	image: typeof images[number],
 	corner?: number,
 ) => {
-	dragInProgress.image = image;
+	if (down) {
+		if (!(down.target instanceof SVGGeometryElement)) throw new Error('DOWN_TARGET_NOT_SVG_GEOMETRY_ELEMENT');
+
+		dragInProgress.image = image;
+		dragInProgress.handle = down.target;
+		dragInProgress.downPoint = getSvgPoint(down.clientX, down.clientY, down.target);
+	}
 
 	if (drag) {
+		if (!dragInProgress.handle) throw new Error('NO_DRAG_TARGET');
+		if (!dragInProgress.downPoint) throw new Error('NO_DOWN_POINT');
+
+		const dragPoint = getSvgPoint(drag.clientX, drag.clientY, dragInProgress.handle);
+
+		const dx = dragPoint.x - dragInProgress.downPoint.x;
+		const dy = dragPoint.y - dragInProgress.downPoint.y;
+
 		if (corner === 0) {
-			dragInProgress.x += drag.movementX;
-			dragInProgress.y += drag.movementY;
-			dragInProgress.height -= drag.movementY;
-			dragInProgress.width -= drag.movementX;
+			dragInProgress.dx = dx;
+			dragInProgress.dy = dy;
+			dragInProgress.dWidth = -1 * dx;
+			dragInProgress.dHeight = -1 * dy;
 		} else if (corner === 1) {
-			dragInProgress.y += drag.movementY;
-			dragInProgress.height -= drag.movementY;
-			dragInProgress.width += drag.movementX;
+			dragInProgress.dy = dy;
+			dragInProgress.dWidth = dx;
+			dragInProgress.dHeight = -1 * dy;
 		} else if (corner === 2) {
-			dragInProgress.height += drag.movementY;
-			dragInProgress.width += drag.movementX;
+			dragInProgress.dWidth = dx;
+			dragInProgress.dHeight = dy;
 		} else if (corner === 3) {
-			dragInProgress.x += drag.movementX;
-			dragInProgress.height += drag.movementY;
-			dragInProgress.width -= drag.movementX;
+			dragInProgress.dx = dx;
+			dragInProgress.dWidth = -1 * dx;
+			dragInProgress.dHeight = dy;
 		} else {
-			dragInProgress.x += drag.movementX;
-			dragInProgress.y += drag.movementY;
+			dragInProgress.dx = dx;
+			dragInProgress.dy = dy;
 		}
 
 		// If we go negative, just bail for now.
 
-		if (image.width + dragInProgress.width < 0) {
-			dragInProgress.x = 0;
-			dragInProgress.width = 0;
+		if (image.width + dragInProgress.dWidth < 0) {
+			dragInProgress.dx = 0;
+			dragInProgress.dWidth = 0;
 		}
 
-		if (image.height + dragInProgress.height < 0) {
-			dragInProgress.y = 0;
-			dragInProgress.height = 0;
+		if (image.height + dragInProgress.dHeight < 0) {
+			dragInProgress.dy = 0;
+			dragInProgress.dHeight = 0;
 		}
 	}
 
 	if (release) {
 		startViewTransition(async () => {
 			const apply = release instanceof PointerEvent || release.key === 'Enter';
+
 			if (dragInProgress.image && apply) {
-				dragInProgress.image.x += dragInProgress.x;
-				dragInProgress.image.y += dragInProgress.y;
-				dragInProgress.image.width += dragInProgress.width;
-				dragInProgress.image.height += dragInProgress.height;
+				dragInProgress.image.x += dragInProgress.dx;
+				dragInProgress.image.y += dragInProgress.dy;
+				dragInProgress.image.width += dragInProgress.dWidth;
+				dragInProgress.image.height += dragInProgress.dHeight;
 			}
-			Object.assign(dragInProgress, { image: null, x: 0, y: 0, width: 0, height: 0 });
+
+			dragInProgress.hovered = null;
+			dragInProgress.image = null;
+			dragInProgress.handle = null;
+			dragInProgress.downPoint = null;
+			dragInProgress.dx = 0;
+			dragInProgress.dy = 0;
+			dragInProgress.dWidth = 0;
+			dragInProgress.dHeight = 0;
 		});
 	}
 });
@@ -148,10 +173,10 @@ const handleImageDrag = createDragHandler((
 								@pointerleave="dragInProgress.hovered = null"
 							>
 								<rect
-									:x="(offset.x + pageSetup.margin + image.x) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.x : 0)"
-									:y="(offset.y + pageSetup.margin + image.y) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.y : 0)"
-									:width="image.width + dragInProgress.width"
-									:height="image.height + dragInProgress.height"
+									:x="(offset.x + pageSetup.margin + image.x) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.dx : 0)"
+									:y="(offset.y + pageSetup.margin + image.y) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.dy : 0)"
+									:width="image.width + dragInProgress.dWidth"
+									:height="image.height + dragInProgress.dHeight"
 									class="drag-handle"
 									:class="{
 										hover: image === dragInProgress.hovered && !dragInProgress.image,
@@ -161,11 +186,11 @@ const handleImageDrag = createDragHandler((
 								/>
 
 								<g :opacity="image === dragInProgress.hovered && !dragInProgress.image ? 1 : 0">
-									<template v-for="[cx, cy], ci of [[0, 0], [1, 0], [1, 1], [0, 1]] as const" :key="[cx, cy]">
+									<template v-for="[cx, cy], ci of [[0, 0], [1, 0], [1, 1], [0, 1]] as const" :key="[cx, cy].join(',')">
 										<circle
 											class="resize-handle"
-											:cx="(offset.x + pageSetup.margin + image.x + cx * image.width) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.x : 0)"
-											:cy="(offset.y + pageSetup.margin + image.y + cy * image.height) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.y : 0)"
+											:cx="(offset.x + pageSetup.margin + image.x + cx * image.width) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.dx : 0)"
+											:cy="(offset.y + pageSetup.margin + image.y + cy * image.height) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.dy : 0)"
 											@pointerdown="handleImageDrag($event, image, ci)"
 										/>
 									</template>
@@ -260,10 +285,10 @@ const handleImageDrag = createDragHandler((
 				v-for="image in images"
 				:key="image.img.src"
 				:href="image.img.src"
-				:x="image.x + (image === dragInProgress.image ? dragInProgress.x : 0)"
-				:y="image.y + (image === dragInProgress.image ? dragInProgress.y : 0)"
-				:width="image.width + (image === dragInProgress.image ? dragInProgress.width : 0)"
-				:height="image.height + (image === dragInProgress.image ? dragInProgress.height : 0)"
+				:x="image.x + (image === dragInProgress.image ? dragInProgress.dx : 0)"
+				:y="image.y + (image === dragInProgress.image ? dragInProgress.dy : 0)"
+				:width="image.width + (image === dragInProgress.image ? dragInProgress.dWidth : 0)"
+				:height="image.height + (image === dragInProgress.image ? dragInProgress.dHeight : 0)"
 				preserveAspectRatio="none"
 			/>
 		</svg>
