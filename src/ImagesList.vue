@@ -56,7 +56,7 @@ function removeFile(file: File) {
 		<ul v-if="images.length !== 0">
 			<li v-for="image, i in images" :key="image.img.src" :style="`view-transition-name: row-${image.file.name.replace(/\W/g, '')};`">
 				<div class="header">
-					<div style="scale: 0.8;">
+					<div v-if="images.length !== 1" style="scale: 0.8;">
 						<button type="button" :disabled="i === 0" aria-label="Send back" @click="moveFile(i, i - 1)">
 							▲
 						</button>
@@ -83,19 +83,21 @@ function removeFile(file: File) {
 
 				<table>
 					<tbody>
-						<tr>
-							<th>Left</th>
-							<td>
-								<UnitInput v-model="image.x" />
-							</td>
-						</tr>
+						<template v-if="images.length !== 1">
+							<tr>
+								<th>Left</th>
+								<td>
+									<UnitInput v-model="image.x" />
+								</td>
+							</tr>
 
-						<tr>
-							<th>Top</th>
-							<td>
-								<UnitInput v-model="image.y" />
-							</td>
-						</tr>
+							<tr>
+								<th>Top</th>
+								<td>
+									<UnitInput v-model="image.y" />
+								</td>
+							</tr>
+						</template>
 
 						<tr>
 							<th>Width</th>
@@ -145,7 +147,10 @@ function removeFile(file: File) {
 
 		<p style="text-align: center;">
 			<FileSelectionButton v-slot="{ handleClick }" accept="image/*" @select="handleFileSelection">
-				<button type="button" @click="handleClick">Add an image</button>
+				<button type="button" @click="handleClick">
+					<template v-if="images.length === 0">Add an image</template>
+					<template v-else>Add another image</template>
+				</button>
 			</FileSelectionButton>
 		</p>
 	</fieldset>

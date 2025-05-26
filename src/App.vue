@@ -19,10 +19,22 @@ function handlePrintClick() {
 			<p style="text-align: center;">
 				<button type="button" @click="handlePrintClick">Print</button>
 			</p>
+
+			<hr>
+			<p class="attribution">
+				By <a href="https://brian.carstensen.dev/" target="brian-home">Brian Carstensen</a>
+				<br>
+				<a href="https://github.com/brian-c/print-tiler/" target="source">Source on GitHub</a>
+			</p>
 		</div>
 
 		<div class="preview">
-			<TiledOutput v-if="images.length !== 0" />
+			<div v-if="images.length === 0" class="intro">
+				<h1>Print Tiler</h1>
+				<p>Add an image, set its size, and Print Tiler will spread it across as many pages as it needs to.</p>
+			</div>
+
+			<TiledOutput v-else />
 		</div>
 	</div>
 </template>
@@ -40,8 +52,28 @@ function handlePrintClick() {
 		float: inline-start;
 	}
 
+	.attribution {
+		font-size: smaller;
+		text-align: center;
+	}
+
+	.intro {
+		bottom: 0;
+		max-width: 60ch;
+		position: sticky;
+		text-align: center;
+		text-wrap: balance;
+	}
+
 	.preview {
 		flex: 3 0 50%;
+
+		&:has(.intro) {
+			align-items: center;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+		}
 	}
 }
 </style>

@@ -5,7 +5,7 @@ import UnitInput from './UnitInput.vue';
 
 <template>
 	<fieldset>
-		<legend>Page</legend>
+		<legend>Page setup</legend>
 		<table>
 			<tbody>
 				<tr>

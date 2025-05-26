@@ -2,6 +2,7 @@
 import { computed, reactive } from 'vue';
 import { images, pageSetup } from './lib/app-state';
 import { createDragHandler, getSvgPoint } from './lib/create-drag-handler';
+import { pressedKeys } from './lib/pressed-keys';
 import startViewTransition from './lib/start-view-transition';
 import media from './media.module.css';
 
@@ -109,14 +110,27 @@ const handleImageDrag = createDragHandler((
 			dragInProgress.dy = dy;
 		}
 
+		const maintainRatio = pressedKeys.has('Shift');
+		if (maintainRatio) {
+			if (!dragInProgress.image) throw new Error('NO_IMAGE');
+			const ratio = dragInProgress.image.width / dragInProgress.image.height;
+			const fixedDWidth = dragInProgress.dHeight * ratio;
+			const fixedDHeight = dragInProgress.dWidth / ratio;
+			if (fixedDWidth > fixedDHeight) {
+				dragInProgress.dWidth = fixedDWidth;
+			} else {
+				dragInProgress.dHeight = fixedDHeight;
+			}
+		}
+
 		// If we go negative, just bail for now.
 
-		if (image.width + dragInProgress.dWidth < 0) {
+		if (image.width + dragInProgress.dWidth < 1) {
 			dragInProgress.dx = 0;
 			dragInProgress.dWidth = 0;
 		}
 
-		if (image.height + dragInProgress.dHeight < 0) {
+		if (image.height + dragInProgress.dHeight < 1) {
 			dragInProgress.dy = 0;
 			dragInProgress.dHeight = 0;
 		}
