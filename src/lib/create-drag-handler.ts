@@ -35,7 +35,7 @@ export function createDragHandler<ExtraArgs extends unknown[]>(
 	};
 }
 
-export function getSvgPoint(x: number, y: number, element: SVGGeometryElement) {
+export function getSvgPoint([x, y]: [number, number], element: SVGGeometryElement) {
 	const svg = element.ownerSVGElement;
 	if (!svg) throw new Error('NO_SVG_ANCESTOR');
 	const point = svg.createSVGPoint();

@@ -77,14 +77,14 @@ const handleImageDrag = createDragHandler((
 
 		dragInProgress.image = image;
 		dragInProgress.handle = down.target;
-		dragInProgress.downPoint = getSvgPoint(down.clientX, down.clientY, down.target);
+		dragInProgress.downPoint = getSvgPoint([down.clientX, down.clientY], down.target);
 	}
 
 	if (drag) {
 		if (!dragInProgress.handle) throw new Error('NO_DRAG_TARGET');
 		if (!dragInProgress.downPoint) throw new Error('NO_DOWN_POINT');
 
-		const dragPoint = getSvgPoint(drag.clientX, drag.clientY, dragInProgress.handle);
+		const dragPoint = getSvgPoint([drag.clientX, drag.clientY], dragInProgress.handle);
 
 		const dx = dragPoint.x - dragInProgress.downPoint.x;
 		const dy = dragPoint.y - dragInProgress.downPoint.y;
@@ -122,18 +122,6 @@ const handleImageDrag = createDragHandler((
 				dragInProgress.dHeight = fixedDHeight;
 			}
 		}
-
-		// If we go negative, just bail for now.
-
-		if (image.width + dragInProgress.dWidth < 1) {
-			dragInProgress.dx = 0;
-			dragInProgress.dWidth = 0;
-		}
-
-		if (image.height + dragInProgress.dHeight < 1) {
-			dragInProgress.dy = 0;
-			dragInProgress.dHeight = 0;
-		}
 	}
 
 	if (release) {
@@ -141,10 +129,12 @@ const handleImageDrag = createDragHandler((
 			const apply = release instanceof PointerEvent || release.key === 'Enter';
 
 			if (dragInProgress.image && apply) {
-				dragInProgress.image.x += dragInProgress.dx;
-				dragInProgress.image.y += dragInProgress.dy;
-				dragInProgress.image.width += dragInProgress.dWidth;
-				dragInProgress.image.height += dragInProgress.dHeight;
+				const normalized = normalizedImages.value.find(n => n.image === dragInProgress.image);
+				if (!normalized) throw new Error('NO_NORMALIZED_IMAGE');
+				dragInProgress.image.x = normalized.x;
+				dragInProgress.image.y = normalized.y;
+				dragInProgress.image.width = normalized.width;
+				dragInProgress.image.height = normalized.height;
 			}
 
 			dragInProgress.hovered = null;
@@ -157,6 +147,31 @@ const handleImageDrag = createDragHandler((
 			dragInProgress.dHeight = 0;
 		});
 	}
+});
+
+const normalizedImages = computed(() => {
+	return images.map((image) => {
+		let { x, y, width, height } = image;
+
+		if (image === dragInProgress.image) {
+			x += dragInProgress.dx;
+			y += dragInProgress.dy;
+			width += dragInProgress.dWidth;
+			height += dragInProgress.dHeight;
+
+			if (width < 0) {
+				x += width;
+				width *= -1;
+			}
+
+			if (height < 0) {
+				y += height;
+				height *= -1;
+			}
+		}
+
+		return { image, x, y, width, height };
+	});
 });
 </script>
 
@@ -181,31 +196,31 @@ const handleImageDrag = createDragHandler((
 
 						<template v-if="images.length > 1">
 							<g
-								v-for="image in images"
-								:key="image.img.src"
-								@pointerenter="dragInProgress.hovered = image"
+								v-for="normalized in normalizedImages"
+								:key="normalized.image.img.src"
+								@pointerenter="dragInProgress.hovered = normalized.image"
 								@pointerleave="dragInProgress.hovered = null"
 							>
 								<rect
-									:x="(offset.x + pageSetup.margin + image.x) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.dx : 0)"
-									:y="(offset.y + pageSetup.margin + image.y) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.dy : 0)"
-									:width="image.width + dragInProgress.dWidth"
-									:height="image.height + dragInProgress.dHeight"
+									:x="(offset.x + pageSetup.margin + normalized.x) + -1 * x * tiles.width + x * pageSetup.overlap * 2"
+									:y="(offset.y + pageSetup.margin + normalized.y) + -1 * y * tiles.height + y * pageSetup.overlap * 2"
+									:width="normalized.width"
+									:height="normalized.height"
 									class="drag-handle"
 									:class="{
-										hover: image === dragInProgress.hovered && !dragInProgress.image,
-										active: image === dragInProgress.image,
+										hover: normalized.image === dragInProgress.hovered && !dragInProgress.image,
+										active: normalized.image === dragInProgress.image,
 									}"
-									@pointerdown="handleImageDrag($event, image)"
+									@pointerdown="handleImageDrag($event, normalized.image)"
 								/>
 
-								<g :opacity="image === dragInProgress.hovered && !dragInProgress.image ? 1 : 0">
+								<g :opacity="normalized.image === dragInProgress.hovered && !dragInProgress.image ? 1 : 0">
 									<template v-for="[cx, cy], ci of [[0, 0], [1, 0], [1, 1], [0, 1]] as const" :key="[cx, cy].join(',')">
 										<circle
 											class="resize-handle"
-											:cx="(offset.x + pageSetup.margin + image.x + cx * image.width) + -1 * x * tiles.width + x * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.dx : 0)"
-											:cy="(offset.y + pageSetup.margin + image.y + cy * image.height) + -1 * y * tiles.height + y * pageSetup.overlap * 2 + (image === dragInProgress.image ? dragInProgress.dy : 0)"
-											@pointerdown="handleImageDrag($event, image, ci)"
+											:cx="(offset.x + pageSetup.margin + normalized.x + cx * normalized.width) + -1 * x * tiles.width + x * pageSetup.overlap * 2"
+											:cy="(offset.y + pageSetup.margin + normalized.y + cy * normalized.height) + -1 * y * tiles.height + y * pageSetup.overlap * 2"
+											@pointerdown="handleImageDrag($event, normalized.image, ci)"
 										/>
 									</template>
 								</g>
@@ -296,13 +311,13 @@ const handleImageDrag = createDragHandler((
 			style="overflow: visible;"
 		>
 			<image
-				v-for="image in images"
-				:key="image.img.src"
-				:href="image.img.src"
-				:x="image.x + (image === dragInProgress.image ? dragInProgress.dx : 0)"
-				:y="image.y + (image === dragInProgress.image ? dragInProgress.dy : 0)"
-				:width="image.width + (image === dragInProgress.image ? dragInProgress.dWidth : 0)"
-				:height="image.height + (image === dragInProgress.image ? dragInProgress.dHeight : 0)"
+				v-for="normalized in normalizedImages"
+				:key="normalized.image.img.src"
+				:href="normalized.image.img.src"
+				:x="normalized.x"
+				:y="normalized.y"
+				:width="normalized.width"
+				:height="normalized.height"
 				preserveAspectRatio="none"
 			/>
 		</svg>
