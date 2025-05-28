@@ -4,7 +4,7 @@ import { images, pageSetup } from './lib/app-state';
 import { createDragHandler, getSvgPoint } from './lib/create-drag-handler';
 import { pressedKeys } from './lib/pressed-keys';
 import startViewTransition from './lib/start-view-transition';
-import media from './media.module.css';
+import utility from './utility.module.css';
 
 const bbox = computed(() => {
 	const bounds = Array.from(images).reduce((current, file) => {
@@ -176,7 +176,7 @@ const normalizedImages = computed(() => {
 </script>
 
 <template>
-	<fieldset :class="media['screenOnly']">
+	<fieldset :class="utility['screenOnly']">
 		<legend>Output</legend>
 
 		<div class="sheets">
@@ -232,7 +232,7 @@ const normalizedImages = computed(() => {
 		</div>
 	</fieldset>
 
-	<div :class="media['printOnly']">
+	<div :class="utility['printOnly']">
 		<template v-for="_y, y in tiles.down" :key="y">
 			<template v-for="_x, x in tiles.across" :key="x">
 				<svg

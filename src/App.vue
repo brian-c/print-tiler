@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ImagesList from './ImagesList.vue';
 import { images } from './lib/app-state';
-import media from './media.module.css';
+import utility from './utility.module.css';
 import PageSetup from './PageSetup.vue';
 import TiledOutput from './TiledOutput.vue';
 
@@ -12,7 +12,7 @@ function handlePrintClick() {
 
 <template>
 	<div class="layout">
-		<div class="controls" :class="media['screenOnly']">
+		<div class="controls" :class="utility['screenOnly']">
 			<ImagesList />
 			<PageSetup />
 
@@ -44,7 +44,7 @@ function handlePrintClick() {
 	.layout {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 4px;
+		gap: 1rem;
 	}
 
 	.controls {

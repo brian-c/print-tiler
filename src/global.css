@@ -1,0 +1,22 @@
+hr {
+	border: 1px solid #8888;
+	border-width: 1px 0 0 0;
+
+}
+
+fieldset {
+	border: 1px solid #8888;
+}
+
+fieldset + fieldset {
+	margin-block-start: 1rem;
+}
+
+legend {
+	font: bold smaller sans-serif;
+}
+
+th {
+	font: bold smaller sans-serif;
+	text-align: start;
+}
