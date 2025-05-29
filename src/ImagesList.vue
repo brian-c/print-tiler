@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, reactive } from 'vue';
 import FileSelectionButton from './FileSelectionButton.vue';
 import { images } from './lib/app-state';
 import { loadImage } from './lib/load-image';
@@ -47,21 +48,75 @@ function removeFile(file: File) {
 		images.splice(index, 1);
 	});
 }
+
+const drag = reactive({ from: NaN, to: NaN });
+
+function handleDragStart(index: number, event: DragEvent) {
+	if (!(event.currentTarget instanceof Element)) return;
+	if (!event.dataTransfer) return;
+	const bbox = event.currentTarget.getBoundingClientRect();
+	const offset = [event.clientX - bbox.left, event.clientY - bbox.top] as const;
+	event.dataTransfer.setData('text/plain', 'Foo');
+	event.dataTransfer.setDragImage(event.currentTarget, ...offset);
+	event.dataTransfer.effectAllowed = 'move';
+	startViewTransition(() => {
+		drag.from = index;
+		drag.to = index;
+	});
+}
+
+function handleDragOver(index: number, event: DragEvent) {
+	event.preventDefault();
+	if (!(event.currentTarget instanceof Element)) return;
+	if (!event.dataTransfer) return;
+	event.dataTransfer.dropEffect = 'move';
+	if (index !== drag.to) {
+		startViewTransition(() => drag.to = index);
+	}
+}
+
+function handleDrop() {
+	images.splice(drag.to, 0, ...images.splice(drag.from, 1));
+}
+
+function handleDragEnd() {
+	startViewTransition(() => {
+		drag.from = NaN;
+		drag.to = NaN;
+	});
+}
+
+const draggableImages = computed(() => {
+	const clone = Array.from(images).map((image, actualIndex) => ({ actualIndex, image }));
+	clone.splice(drag.to, 0, ...clone.splice(drag.from, 1));
+	return clone;
+});
 </script>
 
 <template>
 	<fieldset>
 		<legend>Images</legend>
 
-		<ul v-if="images.length !== 0">
-			<li v-for="image, i in images" :key="image.img.src" :style="`view-transition-name: row-${image.file.name.replace(/\W/g, '')};`">
-				<div class="header">
-					<div v-if="images.length !== 1" style="scale: 0.8;">
-						<button type="button" :disabled="i === 0" aria-label="Send back" @click="moveFile(i, i - 1)">
+		<ul v-if="images.length !== 0" @drop.prevent="handleDrop">
+			<li
+				v-for="{ actualIndex, image }, i in draggableImages"
+				:key="image?.img.src ?? '--'"
+				:class="{ dragging: actualIndex === drag.from }"
+				:style="`view-transition-name: row-${image.file.name.replace(/\W/g, '')};`"
+				@dragover.prevent="handleDragOver(i, $event)"
+			>
+				<div
+					class="header"
+					:draggable="images.length > 1 || (undefined as never)"
+					@dragstart="handleDragStart(actualIndex, $event)"
+					@dragend="handleDragEnd"
+				>
+					<div v-if="images.length > 1" style="scale: 0.8;">
+						<button type="button" :disabled="actualIndex === 0" aria-label="Send back" @click="moveFile(actualIndex, actualIndex - 1)">
 							▲
 						</button>
 						<br>
-						<button type="button" :disabled="i === images.length - 1" aria-label="Bring forward" @click="moveFile(i, i + 1)">
+						<button type="button" :disabled="actualIndex === images.length - 1" aria-label="Bring forward" @click="moveFile(actualIndex, actualIndex + 1)">
 							▼
 						</button>
 					</div>
@@ -83,7 +138,7 @@ function removeFile(file: File) {
 
 				<table>
 					<tbody>
-						<template v-if="images.length !== 1">
+						<template v-if="images.length > 1">
 							<tr>
 								<th>Left</th>
 								<td>
@@ -157,16 +212,30 @@ function removeFile(file: File) {
 </template>
 
 <style scoped>
+:global(html:has(.dragging)) {
+	cursor: grabbing;
+}
+
 ul {
 	list-style: none;
 	margin: 0;
 	padding: 0;
 }
 
-li:not(:first-child) {
-	border-block-start: 1px solid #8886;
-	margin-block-start: 1ch;
-	padding-block-start: 1ch;
+li {
+	&:not(:first-child) {
+		border-block-start: 1px solid #8886;
+		margin-block-start: 1ch;
+		padding-block-start: 1ch;
+	}
+
+	&.dragging {
+		opacity: 0.3;
+	}
+}
+
+ul:has(.dragging) li table {
+	display: none;
 }
 
 .header {
@@ -174,5 +243,14 @@ li:not(:first-child) {
 	display: flex;
 	gap: 1ch;
 	vertical-align: middle;
+}
+
+.dragging .header {
+	opacity: 0.5;
+}
+
+.header[draggable]:not(.dragging *) {
+	cursor: grab;
+	user-select: none;
 }
 </style>

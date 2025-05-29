@@ -372,14 +372,14 @@ const normalizedImages = computed(() => {
 	}
 
 	&.active {
-		stroke: ActiveText;
+		stroke: LinkText;
 	}
 }
 
 .resize-handle {
-	fill: color-mix(in srgb, ActiveText 20%, transparent);
+	fill: color-mix(in srgb, LinkText 50%, transparent);
 	r: 4px;
-	stroke: ActiveText;
+	stroke: LinkText;
 	stroke-width: 1px;
 
 	&:nth-of-type(1),
