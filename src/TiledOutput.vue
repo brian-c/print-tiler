@@ -5,54 +5,7 @@ import { createDragHandler, getSvgPoint } from './lib/create-drag-handler';
 import { pressedKeys } from './lib/pressed-keys';
 import startViewTransition from './lib/start-view-transition';
 import utility from './utility.module.css';
-
-const bbox = computed(() => {
-	const bounds = Array.from(images).reduce((current, file) => {
-		return [
-			Math.min(current[0], file.y),
-			Math.max(current[1], file.x + file.width),
-			Math.max(current[2], file.y + file.height),
-			Math.min(current[3], file.x),
-		] as const;
-	}, [Infinity, -Infinity, -Infinity, Infinity] as const);
-
-	const [top, right, bottom, left] = bounds;
-
-	return {
-		x: left,
-		y: top,
-		width: right - left,
-		height: bottom - top,
-	} as const;
-});
-
-const tiles = computed(() => {
-	const width = pageSetup.width - pageSetup.margin * 2;
-	let tiledBboxWidth = Infinity;
-	let across = 0;
-	while (tiledBboxWidth > width * across - pageSetup.overlap * (across - 1)) {
-		across += 1;
-		tiledBboxWidth = bbox.value.width + pageSetup.overlap * (across - 1);
-	}
-
-	const height = pageSetup.height - pageSetup.margin * 2;
-	let tiledBboxHeight = Infinity;
-	let down = 0;
-	while (tiledBboxHeight > height * down - pageSetup.overlap * (down - 1)) {
-		down += 1;
-		tiledBboxHeight = bbox.value.height + pageSetup.overlap * (down - 1);
-	}
-
-	return { width, height, across, down, tiledBboxWidth, tiledBboxHeight };
-});
-
-const offset = computed(() => {
-	const { width, height, across, down, tiledBboxWidth, tiledBboxHeight } = tiles.value;
-	return {
-		x: (width * across - tiledBboxWidth - pageSetup.overlap * (across - 1)) / 2,
-		y: (height * down - tiledBboxHeight - pageSetup.overlap * (down - 1)) / 2,
-	};
-});
+import { bbox, offset, tiles } from './lib/tiles';
 
 const dragInProgress = reactive({
 	hovered: null as typeof images[number] | null,
@@ -177,7 +130,7 @@ const normalizedImages = computed(() => {
 
 <template>
 	<fieldset :class="utility['screenOnly']">
-		<legend>Output</legend>
+		<legend>Printed pages</legend>
 
 		<div class="sheets">
 			<template v-for="_y, y in tiles.down" :key="y">

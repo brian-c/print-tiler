@@ -1,6 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { pageSetup, unit } from './lib/app-state';
+import startViewTransition from './lib/start-view-transition';
+import { tiles, tilesCount, tilesCountIfRotated } from './lib/tiles';
 import UnitInput from './UnitInput.vue';
+
+function rotatePages() {
+	startViewTransition(() => {
+		[pageSetup.width, pageSetup.height] = [pageSetup.height, pageSetup.width];
+	});
+}
 </script>
 
 <template>
@@ -59,8 +68,14 @@ import UnitInput from './UnitInput.vue';
 		</table>
 
 		<p style="text-align: center;">
-			<button type="button" @click="() => [pageSetup.width, pageSetup.height] = [pageSetup.height, pageSetup.width]">
+			<button type="button" @click="rotatePages">
 				Rotate pages
+				<template v-if="tilesCount === tilesCountIfRotated">
+					({{ tilesCount }})
+				</template>
+				<template v-else>
+					({{ tilesCount }}→{{ tilesCountIfRotated }})
+				</template>
 			</button>
 		</p>
 	</fieldset>

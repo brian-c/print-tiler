@@ -160,7 +160,7 @@ const draggableImages = computed(() => {
 					</div>
 				</div>
 
-				<table v-for="ppis of [getPpi(image)]" :key="String(ppis)">
+				<table v-for="ppis of [getPpi(image)]" :key="image?.img.src ?? ppis">
 					<tbody>
 						<template v-if="images.length > 1">
 							<tr>
