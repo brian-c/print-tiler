@@ -10,7 +10,7 @@ function getPpi(image: typeof images[number]) {
 	return Array.from(new Set([
 		parseFloat((image.img.naturalWidth / (image.width / 25.4)).toFixed(2)),
 		parseFloat((image.img.naturalHeight / (image.height / 25.4)).toFixed(2)),
-	]));
+	])) as [number] | [number, number];
 }
 
 async function handleFileSelection(selection: File[]) {
@@ -49,6 +49,16 @@ function removeFile(file: File) {
 	});
 }
 
+function fixAspectRatio(image: typeof images[number], change: 'width' | 'height') {
+	startViewTransition(() => {
+		if (change === 'width') {
+			image.width = image.height * image.img.naturalWidth / image.img.naturalHeight;
+		} else {
+			image.height = image.width * image.img.naturalHeight / image.img.naturalWidth;
+		}
+	});
+}
+
 const drag = reactive({ from: NaN, to: NaN });
 
 function handleDragStart(index: number, event: DragEvent) {
@@ -76,7 +86,9 @@ function handleDragOver(index: number, event: DragEvent) {
 }
 
 function handleDrop() {
-	images.splice(drag.to, 0, ...images.splice(drag.from, 1));
+	startViewTransition(() => {
+		images.splice(drag.to, 0, ...images.splice(drag.from, 1));
+	});
 }
 
 function handleDragEnd() {
@@ -112,11 +124,23 @@ const draggableImages = computed(() => {
 					@dragend="handleDragEnd"
 				>
 					<div v-if="images.length > 1" style="scale: 0.8;">
-						<button type="button" :disabled="actualIndex === 0" aria-label="Send back" @click="moveFile(actualIndex, actualIndex - 1)">
+						<button
+							type="button"
+							:disabled="actualIndex === 0"
+							title="Send back"
+							style="padding-inline: 0.2ch;"
+							@click="moveFile(actualIndex, actualIndex - 1)"
+						>
 							▲
 						</button>
 						<br>
-						<button type="button" :disabled="actualIndex === images.length - 1" aria-label="Bring forward" @click="moveFile(actualIndex, actualIndex + 1)">
+						<button
+							type="button"
+							:disabled="actualIndex === images.length - 1"
+							title="Bring forward"
+							style="padding-inline: 0.2ch;"
+							@click="moveFile(actualIndex, actualIndex + 1)"
+						>
 							▼
 						</button>
 					</div>
@@ -130,13 +154,13 @@ const draggableImages = computed(() => {
 					</div>
 
 					<div>
-						<button type="button" aria-label="Remove" @click="removeFile(image.file)">
+						<button type="button" title="Remove" @click="removeFile(image.file)">
 							✕
 						</button>
 					</div>
 				</div>
 
-				<table>
+				<table v-for="ppis of [getPpi(image)]" :key="String(ppis)">
 					<tbody>
 						<template v-if="images.length > 1">
 							<tr>
@@ -158,13 +182,16 @@ const draggableImages = computed(() => {
 							<th>Width</th>
 							<td>
 								<UnitInput v-model="image.width">
-									<template v-if="getPpi(image).length === 2" #after>
+									<template #after>
 										<button
+											v-if="ppis.length !== 1"
 											type="button"
-											aria-label="Fix aspect ratio horizontally"
-											@click="image.width = image.height * image.img.naturalWidth / image.img.naturalHeight"
+											class="ratio-fixer"
+											:title="ppis[0] > ppis[1] ? 'Make wider' : 'Make narrower'"
+											@click="fixAspectRatio(image, 'width')"
 										>
-											⧉
+											<template v-if="ppis[0] > ppis[1]">↦</template>
+											<template v-else>↤</template>
 										</button>
 									</template>
 								</UnitInput>
@@ -175,13 +202,16 @@ const draggableImages = computed(() => {
 							<th>Height</th>
 							<td>
 								<UnitInput v-model="image.height">
-									<template v-if="getPpi(image).length === 2" #after>
+									<template #after>
 										<button
+											v-if="ppis.length !== 1"
 											type="button"
-											aria-label="Fix aspect ratio vertically"
-											@click="image.height = image.width * image.img.naturalHeight / image.img.naturalWidth"
+											class="ratio-fixer"
+											:title="ppis[0] > ppis[1] ? 'Make shorter' : 'Make taller'"
+											@click="fixAspectRatio(image, 'height')"
 										>
-											⧉
+											<template v-if="ppis[0] > ppis[1]">↥</template>
+											<template v-else>↧</template>
 										</button>
 									</template>
 								</UnitInput>
@@ -191,8 +221,8 @@ const draggableImages = computed(() => {
 						<tr>
 							<th>PPI</th>
 							<td>
-								<abbr v-if="getPpi(image).length !== 1" title="Out of proportion">⚠</abbr>
-								{{ getPpi(image).join(' &times; ') }}
+								<abbr v-if="ppis.length !== 1" title="Out of proportion">⚠</abbr>
+								{{ ppis.join(' &times; ') }}
 							</td>
 						</tr>
 					</tbody>
@@ -234,9 +264,9 @@ li {
 	}
 }
 
-ul:has(.dragging) li table {
+/* ul:has(.dragging) li table {
 	display: none;
-}
+} */
 
 .header {
 	align-items: center;
@@ -252,5 +282,9 @@ ul:has(.dragging) li table {
 .header[draggable]:not(.dragging *) {
 	cursor: grab;
 	user-select: none;
+}
+
+.ratio-fixer {
+	font-family: math;
 }
 </style>

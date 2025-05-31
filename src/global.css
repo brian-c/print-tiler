@@ -20,3 +20,7 @@ th {
 	font: bold smaller sans-serif;
 	text-align: start;
 }
+
+button:not(:disabled) {
+	cursor: pointer;
+}
