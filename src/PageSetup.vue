@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { pageSetup, unit } from './lib/app-state';
 import startViewTransition from './lib/start-view-transition';
-import { tiles, tilesCount, tilesCountIfRotated } from './lib/tiles';
+import { tilesCount, tilesCountIfRotated } from './lib/tiles';
 import UnitInput from './UnitInput.vue';
 
 function rotatePages() {
